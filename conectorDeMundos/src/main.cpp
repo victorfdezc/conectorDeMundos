@@ -1,287 +1,167 @@
-/*
-  The TFT_eSPI library incorporates an Adafruit_GFX compatible
-  button handling class, this sketch is based on the Arduin-o-phone
-  example.
+//The Game of Life, also known simply as Life, is a cellular automaton
+//devised by the British mathematician John Horton Conway in 1970.
+// https://en.wikipedia.org/wiki/Conway's_Game_of_Life
 
-  This example displays a keypad where numbers can be entered and
-  sent to the Serial Monitor window.
-
-  The sketch has been tested on the ESP8266 (which supports SPIFFS)
-
-  The minimum screen size is 320 x 240 as that is the keypad size.
-
-  TOUCH_CS and SPI_TOUCH_FREQUENCY must be defined in the User_Setup.h file
-  for the touch functions to do anything.
-*/
-
-// The SPIFFS (FLASH filing system) is used to hold touch screen
-// calibration data
-
-#include "FS.h"
 
 #include <SPI.h>
-#include <TFT_eSPI.h>      // Hardware-specific library
 
-TFT_eSPI tft = TFT_eSPI(); // Invoke custom library
+#include <TFT_eSPI.h> // Hardware-specific library
 
-// This is the file name used to store the calibration data
-// You can change this to create new calibration files.
-// The SPIFFS file name must start with "/".
-#define CALIBRATION_FILE "/TouchCalData2"
+TFT_eSPI tft = TFT_eSPI();       // Invoke custom library
 
-// Set REPEAT_CAL to true instead of false to run calibration
-// again, otherwise it will only be done once.
-// Repeat calibration if you change the screen rotation.
-#define REPEAT_CAL false
+//#define GRIDX 80
+//#define GRIDY 60
+//#define CELLXY 4
 
-// Keypad start position, key sizes and spacing
-#define KEY_X 40 // Centre of key
-#define KEY_Y 96
-#define KEY_W 62 // Width and height
-#define KEY_H 30
-#define KEY_SPACING_X 18 // X and Y gap
-#define KEY_SPACING_Y 20
-#define KEY_TEXTSIZE 1   // Font size multiplier
+#define GRIDX 160
+#define GRIDY 106
+#define CELLXY 3
 
-// Using two fonts since numbers are nice when bold
-#define LABEL1_FONT &FreeSansOblique12pt7b // Key label font 1
-#define LABEL2_FONT &FreeSansBold12pt7b    // Key label font 2
+#define GEN_DELAY 0
 
-// Numeric display box size and location
-#define DISP_X 1
-#define DISP_Y 10
-#define DISP_W 238
-#define DISP_H 50
-#define DISP_TSIZE 3
-#define DISP_TCOLOR TFT_CYAN
+//Current grid
+uint8_t grid[GRIDX][GRIDY];
 
-// Number length, buffer for storing it and character index
-#define NUM_LEN 12
-char numberBuffer[NUM_LEN + 1] = "";
-uint8_t numberIndex = 0;
+//The new grid for the next generation
+uint8_t newgrid[GRIDX][GRIDY];
 
-// We have a status line for messages
-#define STATUS_X 120 // Centred on this
-#define STATUS_Y 65
+//Number of generations
+#define NUMGEN 600
 
-// Create 15 keys for the keypad
-char keyLabel[15][5] = {"New", "Del", "Send", "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "#" };
-uint16_t keyColor[15] = {TFT_RED, TFT_DARKGREY, TFT_DARKGREEN,
-                         TFT_BLUE, TFT_BLUE, TFT_BLUE,
-                         TFT_BLUE, TFT_BLUE, TFT_BLUE,
-                         TFT_BLUE, TFT_BLUE, TFT_BLUE,
-                         TFT_BLUE, TFT_BLUE, TFT_BLUE
-                        };
+uint16_t genCount = 0;
 
-// Invoke the TFT_eSPI button class and create all the button objects
-TFT_eSPI_Button key[15];
 
-//------------------------------------------------------------------------------------------
+// Check the Moore neighbourhood
+int getNumberOfNeighbors(int x, int y) {
+  return grid[x - 1][y] + grid[x - 1][y - 1] + grid[x][y - 1] + grid[x + 1][y - 1] + grid[x + 1][y] + grid[x + 1][y + 1] + grid[x][y + 1] + grid[x - 1][y + 1];
+}
 
-void setup() {
-  // Use serial port
-  Serial.begin(9600);
+//Draws the grid on the display
+void drawGrid(void) {
 
-  // Initialise the TFT screen
+  uint16_t color = TFT_WHITE;
+  for (int16_t x = 1; x < GRIDX - 1; x++) {
+    for (int16_t y = 1; y < GRIDY - 1; y++) {
+      if ((grid[x][y]) != (newgrid[x][y])) {
+        if (newgrid[x][y] == 1) color = 0xFFFF; //random(0xFFFF);
+        else color = 0;
+        tft.fillRect(CELLXY * x, CELLXY * y, CELLXY, CELLXY, color);
+      }
+    }
+  }
+}
+
+//Initialise Grid
+void initGrid(void) {
+  for (int16_t x = 0; x < GRIDX; x++) {
+    for (int16_t y = 0; y < GRIDY; y++) {
+      newgrid[x][y] = 0;
+
+      if (x == 0 || x == GRIDX - 1 || y == 0 || y == GRIDY - 1) {
+        grid[x][y] = 0;
+      }
+      else {
+        if (random(3) == 1)
+          grid[x][y] = 1;
+        else
+          grid[x][y] = 0;
+      }
+
+    }
+  }
+}
+
+//Compute the CA. Basically everything related to CA starts here
+void computeCA() {
+  for (int16_t x = 1; x < GRIDX; x++) {
+    for (int16_t y = 1; y < GRIDY; y++) {
+      int neighbors = getNumberOfNeighbors(x, y);
+      if (grid[x][y] == 1 && (neighbors == 2 || neighbors == 3 ))
+      {
+        newgrid[x][y] = 1;
+      }
+      else if (grid[x][y] == 1)  newgrid[x][y] = 0;
+      if (grid[x][y] == 0 && (neighbors == 3))
+      {
+        newgrid[x][y] = 1;
+      }
+      else if (grid[x][y] == 0) newgrid[x][y] = 0;
+    }
+  }
+}
+
+
+void setup()   {
+
+  //Set up the display
   tft.init();
+  tft.setRotation(3);
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_WHITE);
+  tft.setCursor(0, 0);
 
-  // Set the rotation before we calibrate
-  tft.setRotation(1);
+}
 
-  // Calibrate the touch screen and retrieve the scaling factors
-  touch_calibrate();
+void loop() {
 
-  // Clear the screen
+  //Display a simple splash screen
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextSize(2);
+  tft.setTextColor(TFT_WHITE);
+  tft.setCursor(40, 5);
+  tft.println(F("Arduino"));
+  tft.setCursor(35, 25);
+  tft.println(F("Cellular"));
+  tft.setCursor(35, 45);
+  tft.println(F("Automata"));
+
+  delay(1000);
+
   tft.fillScreen(TFT_BLACK);
 
-  // Draw keypad background
-  tft.fillRect(0, 0, 240, 320, TFT_DARKGREY);
+  initGrid();
 
-  // Draw number display area and frame
-  tft.fillRect(DISP_X, DISP_Y, DISP_W, DISP_H, TFT_BLACK);
-  tft.drawRect(DISP_X, DISP_Y, DISP_W, DISP_H, TFT_WHITE);
+  genCount = NUMGEN;
 
-  // Draw keypad
-  drawKeypad();
-}
+  drawGrid();
 
-//------------------------------------------------------------------------------------------
-
-void loop(void) {
-  uint16_t t_x = 0, t_y = 0; // To store the touch coordinates
-
-  // Pressed will be set true is there is a valid touch on the screen
-  bool pressed = tft.getTouch(&t_x, &t_y);
-
-  // / Check if any key coordinate boxes contain the touch coordinates
-  for (uint8_t b = 0; b < 15; b++) {
-    if (pressed && key[b].contains(t_x, t_y)) {
-      key[b].press(true);  // tell the button it is pressed
-    } else {
-      key[b].press(false);  // tell the button it is NOT pressed
+  //Compute generations
+  for (int gen = 0; gen < genCount; gen++)
+  {
+    computeCA();
+    drawGrid();
+    delay(GEN_DELAY);
+    for (int16_t x = 1; x < GRIDX-1; x++) {
+      for (int16_t y = 1; y < GRIDY-1; y++) {
+        grid[x][y] = newgrid[x][y];
+      }
     }
-  }
 
-  // Check if any key has changed state
-  for (uint8_t b = 0; b < 15; b++) {
-
-    if (b < 3) tft.setFreeFont(LABEL1_FONT);
-    else tft.setFreeFont(LABEL2_FONT);
-
-    if (key[b].justReleased()) key[b].drawButton();     // draw normal
-
-    if (key[b].justPressed()) {
-      key[b].drawButton(true);  // draw invert
-
-      // if a numberpad button, append the relevant # to the numberBuffer
-      if (b >= 3) {
-        if (numberIndex < NUM_LEN) {
-          numberBuffer[numberIndex] = keyLabel[b][0];
-          numberIndex++;
-          numberBuffer[numberIndex] = 0; // zero terminate
-        }
-        status(""); // Clear the old status
-      }
-
-      // Del button, so delete last char
-      if (b == 1) {
-        numberBuffer[numberIndex] = 0;
-        if (numberIndex > 0) {
-          numberIndex--;
-          numberBuffer[numberIndex] = 0;//' ';
-        }
-        status(""); // Clear the old status
-      }
-
-      if (b == 2) {
-        status("Sent value to serial port");
-        Serial.println(numberBuffer);
-      }
-      // we dont really check that the text field makes sense
-      // just try to call
-      if (b == 0) {
-        status("Value cleared");
-        numberIndex = 0; // Reset index to 0
-        numberBuffer[numberIndex] = 0; // Place null in buffer
-      }
-
-      // Update the number display field
-      tft.setTextDatum(TL_DATUM);        // Use top left corner as text coord datum
-      tft.setFreeFont(&FreeSans18pt7b);  // Choose a nice font that fits box
-      tft.setTextColor(DISP_TCOLOR);     // Set the font colour
-
-      // Draw the string, the value returned is the width in pixels
-      int xwidth = tft.drawString(numberBuffer, DISP_X + 4, DISP_Y + 12);
-
-      // Now cover up the rest of the line up by drawing a black rectangle.  No flicker this way
-      // but it will not work with italic or oblique fonts due to character overlap.
-      tft.fillRect(DISP_X + 4 + xwidth, DISP_Y + 1, DISP_W - xwidth - 5, DISP_H - 2, TFT_BLACK);
-
-      delay(10); // UI debouncing
-    }
   }
 }
 
-//------------------------------------------------------------------------------------------
+/*
+   The MIT License (MIT)
 
-void drawKeypad()
-{
-  // Draw the keys
-  for (uint8_t row = 0; row < 5; row++) {
-    for (uint8_t col = 0; col < 3; col++) {
-      uint8_t b = col + row * 3;
+   Copyright (c) 2016 RuntimeProjects.com
 
-      if (b < 3) tft.setFreeFont(LABEL1_FONT);
-      else tft.setFreeFont(LABEL2_FONT);
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
-      key[b].initButton(&tft, KEY_X + col * (KEY_W + KEY_SPACING_X),
-                        KEY_Y + row * (KEY_H + KEY_SPACING_Y), // x, y, w, h, outline, fill, text
-                        KEY_W, KEY_H, TFT_WHITE, keyColor[b], TFT_WHITE,
-                        keyLabel[b], KEY_TEXTSIZE);
-      key[b].drawButton();
-    }
-  }
-}
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
 
-//------------------------------------------------------------------------------------------
-
-void touch_calibrate()
-{
-  uint16_t calData[5];
-  uint8_t calDataOK = 0;
-
-  // check file system exists
-  if (!SPIFFS.begin()) {
-    Serial.println("formatting file system");
-    SPIFFS.format();
-    SPIFFS.begin();
-  }
-
-  // check if calibration file exists and size is correct
-  if (SPIFFS.exists(CALIBRATION_FILE)) {
-    if (REPEAT_CAL)
-    {
-      // Delete if we want to re-calibrate
-      SPIFFS.remove(CALIBRATION_FILE);
-    }
-    else
-    {
-      File f = SPIFFS.open(CALIBRATION_FILE, "r");
-      if (f) {
-        if (f.readBytes((char *)calData, 14) == 14)
-          calDataOK = 1;
-        f.close();
-      }
-    }
-  }
-
-  if (calDataOK && !REPEAT_CAL) {
-    // calibration data valid
-    tft.setTouch(calData);
-  } else {
-    // data not valid so recalibrate
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(20, 0);
-    tft.setTextFont(2);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-
-    tft.println("Touch corners as indicated");
-
-    tft.setTextFont(1);
-    tft.println();
-
-    if (REPEAT_CAL) {
-      tft.setTextColor(TFT_RED, TFT_BLACK);
-      tft.println("Set REPEAT_CAL to false to stop this running again!");
-    }
-
-    tft.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
-
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.println("Calibration complete!");
-
-    // store data
-    File f = SPIFFS.open(CALIBRATION_FILE, "w");
-    if (f) {
-      f.write((const unsigned char *)calData, 14);
-      f.close();
-    }
-  }
-}
-
-//------------------------------------------------------------------------------------------
-
-// Print something in the mini status bar
-void status(const char *msg) {
-  tft.setTextPadding(240);
-  //tft.setCursor(STATUS_X, STATUS_Y);
-  tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
-  tft.setTextFont(0);
-  tft.setTextDatum(TC_DATUM);
-  tft.setTextSize(1);
-  tft.drawString(msg, STATUS_X, STATUS_Y);
-}
-
-//------------------------------------------------------------------------------------------
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+*/
 
