@@ -1,0 +1,1 @@
+savedcmd_/home/victor/arte/conectorDeMundos/conectorDeMundos/doc/CH341SER/modules.order := {   echo /home/victor/arte/conectorDeMundos/conectorDeMundos/doc/CH341SER/ch34x.o; :; } > /home/victor/arte/conectorDeMundos/conectorDeMundos/doc/CH341SER/modules.order
