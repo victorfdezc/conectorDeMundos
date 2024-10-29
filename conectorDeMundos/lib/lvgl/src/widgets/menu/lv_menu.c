@@ -301,12 +301,14 @@ void lv_menu_set_sidebar_page(lv_obj_t * obj, lv_obj_t * page)
             menu->sidebar_header = sidebar_header;
 
             lv_obj_t * sidebar_header_back_btn = lv_button_create(menu->sidebar_header);
+            lv_obj_set_size(sidebar_header_back_btn, 30, 30);
             lv_obj_add_event_cb(sidebar_header_back_btn, lv_menu_back_event_cb, LV_EVENT_CLICKED, menu);
             lv_obj_add_flag(sidebar_header_back_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
             lv_obj_set_flex_flow(sidebar_header_back_btn, LV_FLEX_FLOW_ROW);
             menu->sidebar_header_back_btn = sidebar_header_back_btn;
 
             lv_obj_t * sidebar_header_back_icon = lv_image_create(menu->sidebar_header_back_btn);
+            lv_obj_set_size(sidebar_header_back_icon, 30, 30);
             lv_image_set_src(sidebar_header_back_icon, LV_SYMBOL_LEFT);
 
             lv_obj_t * sidebar_header_title = lv_label_create(menu->sidebar_header);

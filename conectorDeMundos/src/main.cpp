@@ -32,8 +32,8 @@ typedef struct {
 // Calibration file and repeat calibration flag
 #define CALIBRATION_FILE "/TouchCalData"
 #define REPEAT_CAL false
-#define SCREEN_HEIGHT 320 //pixels
-#define SCREEN_WIDTH 240 //pixels
+#define SCREEN_HEIGHT TFT_HOR_RES //pixels
+#define SCREEN_WIDTH TFT_VER_RES //pixels
 
 /*LVGL draw into this buffer, 1/10 screen size usually works well. The size is in bytes*/
 #define DRAW_BUF_SIZE (TFT_HOR_RES * TFT_VER_RES / 10 * (LV_COLOR_DEPTH / 8))
@@ -53,8 +53,6 @@ void my_print( lv_log_level_t level, const char * buf )
 #endif
 
 
-
-#if LV_USE_BUTTON && LV_BUILD_EXAMPLES
 
 static void event_handler(lv_event_t * e)
 {
@@ -92,9 +90,332 @@ void lv_example_button_1(void)
     lv_obj_center(label);
 
 }
+
+void lv_example_flex_1(void)
+{
+    /*Create a container with ROW flex direction*/
+    lv_obj_t * cont_row = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(cont_row, 300, 75);
+    lv_obj_align(cont_row, LV_ALIGN_TOP_MID, 0, 5);
+    lv_obj_set_flex_flow(cont_row, LV_FLEX_FLOW_ROW);
+
+    /*Create a container with COLUMN flex direction*/
+    lv_obj_t * cont_col = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(cont_col, 200, 150);
+    lv_obj_align_to(cont_col, cont_row, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+    lv_obj_set_flex_flow(cont_col, LV_FLEX_FLOW_COLUMN);
+
+    uint32_t i;
+    for(i = 0; i < 10; i++) {
+        lv_obj_t * obj;
+        lv_obj_t * label;
+
+        /*Add items to the row*/
+        obj = lv_button_create(cont_row);
+        lv_obj_set_size(obj, 100, LV_PCT(100));
+
+        label = lv_label_create(obj);
+        lv_label_set_text_fmt(label, "Item: %"LV_PRIu32"", i);
+        lv_obj_center(label);
+
+        /*Add items to the column*/
+        obj = lv_button_create(cont_col);
+        lv_obj_set_size(obj, LV_PCT(100), LV_SIZE_CONTENT);
+
+        label = lv_label_create(obj);
+        lv_label_set_text_fmt(label, "Item: %"LV_PRIu32, i);
+        lv_obj_center(label);
+    }
+}
+void lv_example_style_1(void)
+{
+    static lv_style_t style;
+    lv_style_init(&style);
+    lv_style_set_radius(&style, 5);
+
+    /*Make a gradient*/
+    lv_style_set_width(&style, 150);
+    lv_style_set_height(&style, LV_SIZE_CONTENT);
+
+    lv_style_set_pad_ver(&style, 20);
+    lv_style_set_pad_left(&style, 5);
+
+    lv_style_set_x(&style, lv_pct(50));
+    lv_style_set_y(&style, 80);
+
+    /*Create an object with the new style*/
+    lv_obj_t * obj = lv_obj_create(lv_screen_active());
+    lv_obj_add_style(obj, &style, 0);
+
+    lv_obj_t * label = lv_label_create(obj);
+    lv_label_set_text(label, "Hello");
+}
+
+static void ta_event_cb(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t * ta = (lv_obj_t *)lv_event_get_target(e);
+    lv_obj_t * kb = (lv_obj_t *)lv_event_get_user_data(e);
+    if(code == LV_EVENT_FOCUSED) {
+        lv_keyboard_set_textarea(kb, ta);
+        lv_obj_remove_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    if(code == LV_EVENT_DEFOCUSED) {
+        lv_keyboard_set_textarea(kb, NULL);
+        lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void lv_example_keyboard_1(lv_obj_t * parent, lv_obj_t * page)
+{
+    /*Create a keyboard to use it with an of the text areas*/
+    lv_obj_t * kb = lv_keyboard_create(page);
+
+    /*Create a text area. The keyboard will write here*/
+    lv_obj_t * ta1;
+    ta1 = lv_textarea_create(parent);
+    lv_obj_align(ta1, LV_ALIGN_TOP_LEFT, 10, 10);
+    lv_obj_add_event_cb(ta1, ta_event_cb, LV_EVENT_ALL, kb);
+    lv_textarea_set_placeholder_text(ta1, "Hello");
+    lv_obj_set_size(ta1, 140, 80);
+
+    lv_obj_t * ta2;
+    ta2 = lv_textarea_create(parent);
+    lv_obj_align(ta2, LV_ALIGN_TOP_RIGHT, -10, 10);
+    lv_obj_add_event_cb(ta2, ta_event_cb, LV_EVENT_ALL, kb);
+    lv_obj_set_size(ta2, 140, 80);
+
+    lv_keyboard_set_textarea(kb, ta1);
+
+    /*The keyboard will show Arabic characters if they are enabled */
+#if LV_USE_ARABIC_PERSIAN_CHARS && LV_FONT_DEJAVU_16_PERSIAN_HEBREW
+    lv_obj_set_style_text_font(kb, &lv_font_dejavu_16_persian_hebrew, 0);
+    lv_obj_set_style_text_font(ta1, &lv_font_dejavu_16_persian_hebrew, 0);
+    lv_obj_set_style_text_font(ta2, &lv_font_dejavu_16_persian_hebrew, 0);
 #endif
+}
+
+typedef enum {
+    LV_MENU_ITEM_BUILDER_VARIANT_1,
+    LV_MENU_ITEM_BUILDER_VARIANT_2
+} lv_menu_builder_variant_t;
+
+static void back_event_handler(lv_event_t * e);
+static void switch_handler(lv_event_t * e);
+lv_obj_t * root_page;
+static lv_obj_t * create_text(lv_obj_t * parent, const char * icon, const char * txt,
+                              lv_menu_builder_variant_t builder_variant);
+static lv_obj_t * create_slider(lv_obj_t * parent,
+                                const char * icon, const char * txt, int32_t min, int32_t max, int32_t val);
+static lv_obj_t * create_switch(lv_obj_t * parent,
+                                const char * icon, const char * txt, bool chk);
+
+void lv_example_menu_5(void)
+{
+    lv_obj_t * menu = lv_menu_create(lv_screen_active());
+
+    lv_color_t bg_color = lv_obj_get_style_bg_color(menu, 0);
+    if(lv_color_brightness(bg_color) > 127) {
+        lv_obj_set_style_bg_color(menu, lv_color_darken(lv_obj_get_style_bg_color(menu, 0), 10), 0);
+    }
+    else {
+        lv_obj_set_style_bg_color(menu, lv_color_darken(lv_obj_get_style_bg_color(menu, 0), 50), 0);
+    }
+    lv_menu_set_mode_root_back_button(menu, LV_MENU_ROOT_BACK_BUTTON_ENABLED);
+    lv_obj_add_event_cb(menu, back_event_handler, LV_EVENT_CLICKED, menu);
+    lv_obj_set_size(menu, lv_display_get_horizontal_resolution(NULL), lv_display_get_vertical_resolution(NULL));
+    lv_obj_center(menu);
+
+    lv_obj_t * cont;
+    lv_obj_t * section;
+
+    /*Create sub pages*/
+    lv_obj_t * sub_rol_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_rol_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_rol_page);
+    section = lv_menu_section_create(sub_rol_page);
+    for(uint32_t i = 0; i < 15; i++) {
+        create_text(section, NULL,
+                    "Este es un texto muy largo sobre la historia del personaje",
+                    LV_MENU_ITEM_BUILDER_VARIANT_1);
+    }
+
+    lv_obj_t * sub_chat_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_chat_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_chat_page);
+    section = lv_menu_section_create(sub_chat_page);
+    lv_example_keyboard_1(section,sub_chat_page);
 
 
+    lv_obj_t * sub_mechanics_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_mechanics_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_mechanics_page);
+    section = lv_menu_section_create(sub_mechanics_page);
+    create_slider(section, LV_SYMBOL_SETTINGS, "Velocity", 0, 150, 120);
+    create_slider(section, LV_SYMBOL_SETTINGS, "Acceleration", 0, 150, 50);
+    create_slider(section, LV_SYMBOL_SETTINGS, "Weight limit", 0, 150, 80);
+
+    lv_obj_t * sub_sound_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_sound_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_sound_page);
+    section = lv_menu_section_create(sub_sound_page);
+    create_switch(section, LV_SYMBOL_AUDIO, "Sound", false);
+
+    lv_obj_t * sub_display_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_display_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_display_page);
+    section = lv_menu_section_create(sub_display_page);
+    create_slider(section, LV_SYMBOL_SETTINGS, "Brightness", 0, 150, 100);
+
+    lv_obj_t * sub_software_info_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_software_info_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    section = lv_menu_section_create(sub_software_info_page);
+    create_text(section, NULL, "Version 1.0", LV_MENU_ITEM_BUILDER_VARIANT_1);
+
+    lv_obj_t * sub_legal_info_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_legal_info_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    section = lv_menu_section_create(sub_legal_info_page);
+    for(uint32_t i = 0; i < 15; i++) {
+        create_text(section, NULL,
+                    "This is a long long long long long long long long long text, if it is long enough it may scroll.",
+                    LV_MENU_ITEM_BUILDER_VARIANT_1);
+    }
+
+    lv_obj_t * sub_about_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_about_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_about_page);
+    section = lv_menu_section_create(sub_about_page);
+    cont = create_text(section, NULL, "Software information", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_software_info_page);
+    cont = create_text(section, NULL, "Legal information", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_legal_info_page);
+
+    lv_obj_t * sub_menu_mode_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_menu_mode_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_menu_mode_page);
+    section = lv_menu_section_create(sub_menu_mode_page);
+    cont = create_switch(section, LV_SYMBOL_AUDIO, "Sidebar enable", true);
+    lv_obj_add_event_cb(lv_obj_get_child(cont, 2), switch_handler, LV_EVENT_VALUE_CHANGED, menu);
+
+    /*Create a root page*/
+    root_page = lv_menu_page_create(menu, "Apps");
+    lv_obj_set_style_pad_hor(root_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    section = lv_menu_section_create(root_page);
+    cont = create_text(section, LV_SYMBOL_SETTINGS, "Character", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_rol_page);
+    cont = create_text(section, LV_SYMBOL_SETTINGS, "Chat", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_chat_page);
+
+    create_text(root_page, NULL, "Settings", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    section = lv_menu_section_create(root_page);
+    cont = create_text(section, LV_SYMBOL_SETTINGS, "Mechanics", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_mechanics_page);
+    cont = create_text(section, LV_SYMBOL_AUDIO, "Sound", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_sound_page);
+    cont = create_text(section, LV_SYMBOL_SETTINGS, "Display", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_display_page);
+
+    create_text(root_page, NULL, "Others", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    section = lv_menu_section_create(root_page);
+    cont = create_text(section, NULL, "About", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_about_page);
+    cont = create_text(section, LV_SYMBOL_SETTINGS, "Menu mode", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_menu_mode_page);
+
+    lv_menu_set_sidebar_page(menu, root_page);
+
+    lv_obj_send_event(lv_obj_get_child(lv_obj_get_child(lv_menu_get_cur_sidebar_page(menu), 0), 0), LV_EVENT_CLICKED,
+                      NULL);
+}
+
+static void back_event_handler(lv_event_t * e)
+{
+    lv_obj_t * obj = (lv_obj_t *)lv_event_get_target(e);
+    lv_obj_t * menu = (lv_obj_t *)lv_event_get_user_data(e);
+
+    if(lv_menu_back_button_is_root(menu, obj)) {
+        lv_obj_t * mbox1 = lv_msgbox_create(NULL);
+        lv_msgbox_add_title(mbox1, "Esto es...");
+        lv_msgbox_add_text(mbox1, "Conector de Mundos v1.0.0");
+        lv_msgbox_add_close_button(mbox1);
+    }
+}
+
+static void switch_handler(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t * menu = (lv_obj_t *)lv_event_get_user_data(e);
+    lv_obj_t * obj = (lv_obj_t *)lv_event_get_target(e);
+    if(code == LV_EVENT_VALUE_CHANGED) {
+        if(lv_obj_has_state(obj, LV_STATE_CHECKED)) {
+            lv_menu_set_page(menu, NULL);
+            lv_menu_set_sidebar_page(menu, root_page);
+            lv_obj_send_event(lv_obj_get_child(lv_obj_get_child(lv_menu_get_cur_sidebar_page(menu), 0), 0), LV_EVENT_CLICKED,
+                              NULL);
+        }
+        else {
+            lv_menu_set_sidebar_page(menu, NULL);
+            lv_menu_clear_history(menu); /* Clear history because we will be showing the root page later */
+            lv_menu_set_page(menu, root_page);
+        }
+    }
+}
+
+static lv_obj_t * create_text(lv_obj_t * parent, const char * icon, const char * txt,
+                              lv_menu_builder_variant_t builder_variant)
+{
+    lv_obj_t * obj = lv_menu_cont_create(parent);
+
+    lv_obj_t * img = NULL;
+    lv_obj_t * label = NULL;
+
+    if(icon) {
+        img = lv_image_create(obj);
+        lv_image_set_src(img, icon);
+    }
+
+    if(txt) {
+        label = lv_label_create(obj);
+        lv_label_set_text(label, txt);
+        lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+        lv_obj_set_flex_grow(label, 1);
+    }
+
+    if(builder_variant == LV_MENU_ITEM_BUILDER_VARIANT_2 && icon && txt) {
+        lv_obj_add_flag(img, LV_OBJ_FLAG_FLEX_IN_NEW_TRACK);
+        lv_obj_swap(img, label);
+    }
+
+    return obj;
+}
+
+static lv_obj_t * create_slider(lv_obj_t * parent, const char * icon, const char * txt, int32_t min, int32_t max,
+                                int32_t val)
+{
+    lv_obj_t * obj = create_text(parent, icon, txt, LV_MENU_ITEM_BUILDER_VARIANT_2);
+
+    lv_obj_t * slider = lv_slider_create(obj);
+    lv_obj_set_flex_grow(slider, 1);
+    lv_slider_set_range(slider, min, max);
+    lv_slider_set_value(slider, val, LV_ANIM_OFF);
+
+    if(icon == NULL) {
+        lv_obj_add_flag(slider, LV_OBJ_FLAG_FLEX_IN_NEW_TRACK);
+    }
+
+    return obj;
+}
+
+static lv_obj_t * create_switch(lv_obj_t * parent, const char * icon, const char * txt, bool chk)
+{
+    lv_obj_t * obj = create_text(parent, icon, txt, LV_MENU_ITEM_BUILDER_VARIANT_1);
+
+    lv_obj_t * sw = lv_switch_create(obj);
+    lv_obj_add_state(sw, chk ? LV_STATE_CHECKED : 0);
+
+    return obj;
+}
 
 
 /* LVGL calls it when a rendered image needs to copied to the display*/
@@ -242,15 +563,19 @@ void setup()
 
      lv_demo_widgets();
      */
-    lv_example_button_1();
+    // lv_example_button_1();
+    // lv_example_flex_1();
+    // lv_example_style_1();
+    // lv_example_keyboard_1();
+    lv_example_menu_5();
 
-    lv_obj_t *label = lv_label_create( lv_screen_active() );
-    lv_label_set_text( label, "Esto es un test!" );
-    lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
+    // lv_obj_t *label = lv_label_create( lv_screen_active() );
+    // lv_label_set_text( label, "Esto es un test!" );
+    // lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
 
-    lv_obj_t *label2 = lv_label_create( lv_screen_active() );
-    lv_label_set_text( label2, "Esto es un test 2!" );
-    lv_obj_align( label2, LV_ALIGN_CENTER, 0, 200 );
+    // lv_obj_t *label2 = lv_label_create( lv_screen_active() );
+    // lv_label_set_text( label2, "Esto es un test 2!" );
+    // lv_obj_align( label2, LV_ALIGN_CENTER, 0, 200 );
 
     Serial.println( "Setup done" );
 }
