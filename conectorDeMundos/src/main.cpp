@@ -1,8 +1,33 @@
+/*Using LVGL with Arduino requires some extra steps:
+ *Be sure to read the docs here: https://docs.lvgl.io/master/integration/framework/arduino.html  */
+
+#include <lvgl.h>
+
 #include "FS.h"
 #include <SPI.h>
 #include <TFT_eSPI.h>
 
-TFT_eSPI tft = TFT_eSPI(); // Initialize TFT screen
+#if LV_USE_TFT_ESPI
+#include <TFT_eSPI.h>
+#include "FS.h"
+#endif
+
+/*To use the built-in examples and demos of LVGL uncomment the includes below respectively.
+ *You also need to copy `lvgl/examples` to `lvgl/src/examples`. Similarly for the demos `lvgl/demos` to `lvgl/src/demos`.
+ *Note that the `lv_examples` library is for LVGL v7 and you shouldn't install it for this version (since LVGL v8)
+ *as the examples and demos are now part of the main LVGL library. */
+
+//#include <examples/lv_examples.h>
+//#include <demos/lv_demos.h>
+
+typedef struct {
+    TFT_eSPI * tft;
+} lv_tft_espi_t;
+
+/*Set to your screen resolution and rotation*/
+#define TFT_HOR_RES   320
+#define TFT_VER_RES   480
+#define TFT_ROTATION  LV_DISPLAY_ROTATION_0
 
 // Calibration file and repeat calibration flag
 #define CALIBRATION_FILE "/TouchCalData"
@@ -10,72 +35,102 @@ TFT_eSPI tft = TFT_eSPI(); // Initialize TFT screen
 #define SCREEN_HEIGHT 320 //pixels
 #define SCREEN_WIDTH 240 //pixels
 
-// Main app button labels and colors
-const char *appLabels[6] = {"Role", "Chat", "Polls", "Story", "Game", "Settings"};
-uint16_t appColors[6] = {TFT_RED, TFT_BLUE, TFT_GREEN, TFT_YELLOW, TFT_PURPLE, TFT_ORANGE};
+/*LVGL draw into this buffer, 1/10 screen size usually works well. The size is in bytes*/
+#define DRAW_BUF_SIZE (TFT_HOR_RES * TFT_VER_RES / 10 * (LV_COLOR_DEPTH / 8))
+uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 
-// Button array
-TFT_eSPI_Button appButtons[6];
+// Define global tft
+TFT_eSPI *tft = nullptr; // Initialize TFT screen
 
-// Function prototypes
-void openApp(int appIndex);
-void touch_calibrate();
 
-// Draw the main menu with buttons positioned evenly on the screen
-void drawMainMenu() {
-  tft.fillScreen(TFT_BLACK);
-  tft.setFreeFont(&FreeSansBold12pt7b);
-  
-  int buttonWidth = 80;   // Width of each button
-  int buttonHeight = 60;  // Height of each button
-  int spacingX = 80;      // Horizontal spacing between buttons
-  int spacingY = 80;      // Vertical spacing between rows of buttons
-  int startX = 100;        // X offset for the first button
-  int startY = 100;        // Y offset for the first button
-  
-  for (int i = 0; i < 6; i++) {
-    int row = i / 3;                // Calculate row (0 or 1)
-    int col = i % 3;                // Calculate column (0, 1, or 2)
-    int x = startX + col * (buttonWidth + spacingX); // X position of the button
-    int y = startY + row * (buttonHeight + spacingY); // Y position of the button
-    
-    appButtons[i].initButton(&tft, x, y, buttonWidth, buttonHeight, TFT_WHITE, appColors[i], TFT_WHITE, (char*)appLabels[i], 1);
-    appButtons[i].drawButton();
-  }
+#if LV_USE_LOG != 0
+void my_print( lv_log_level_t level, const char * buf )
+{
+    LV_UNUSED(level);
+    Serial.println(buf);
+    Serial.flush();
+}
+#endif
+
+
+
+#if LV_USE_BUTTON && LV_BUILD_EXAMPLES
+
+static void event_handler(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+
+    if(code == LV_EVENT_CLICKED) {
+        LV_LOG_USER("Clicked");
+    }
+    else if(code == LV_EVENT_VALUE_CHANGED) {
+        LV_LOG_USER("Toggled");
+    }
 }
 
-// Touch input handler for main menu
-void handleMainMenuTouch() {
-  uint16_t t_x, t_y;
-  bool pressed = tft.getTouch(&t_x, &t_y);
+void lv_example_button_1(void)
+{
+    lv_obj_t * label;
 
-  for (int i = 0; i < 6; i++) {
-    if (pressed && appButtons[i].contains(t_x, t_y)) {
-      appButtons[i].press(true);
+    lv_obj_t * btn1 = lv_button_create(lv_screen_active());
+    lv_obj_add_event_cb(btn1, event_handler, LV_EVENT_ALL, NULL);
+    lv_obj_align(btn1, LV_ALIGN_CENTER, 0, -40);
+    lv_obj_remove_flag(btn1, LV_OBJ_FLAG_PRESS_LOCK);
+
+    label = lv_label_create(btn1);
+    lv_label_set_text(label, "Button");
+    lv_obj_center(label);
+
+    lv_obj_t * btn2 = lv_button_create(lv_screen_active());
+    lv_obj_add_event_cb(btn2, event_handler, LV_EVENT_ALL, NULL);
+    lv_obj_align(btn2, LV_ALIGN_CENTER, 0, 40);
+    lv_obj_add_flag(btn2, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_set_height(btn2, LV_SIZE_CONTENT);
+
+    label = lv_label_create(btn2);
+    lv_label_set_text(label, "Toggle");
+    lv_obj_center(label);
+
+}
+#endif
+
+
+
+
+/* LVGL calls it when a rendered image needs to copied to the display*/
+void my_disp_flush( lv_display_t *disp, const lv_area_t *area, uint8_t * px_map)
+{
+    /*Copy `px map` to the `area`*/
+
+    /*For example ("my_..." functions needs to be implemented by you)
+    uint32_t w = lv_area_get_width(area);
+    uint32_t h = lv_area_get_height(area);
+
+    my_set_window(area->x1, area->y1, w, h);
+    my_draw_bitmaps(px_map, w * h);
+     */
+
+    /*Call it to tell LVGL you are ready*/
+    lv_display_flush_ready(disp);
+}
+
+/*Read the touchpad*/
+void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
+{
+    /*For example  ("my_..." functions needs to be implemented by you)*/
+    uint16_t x, y;
+    bool touched = tft->getTouch(&x, &y);
+
+    if(!touched) {
+        data->state = LV_INDEV_STATE_RELEASED;
     } else {
-      appButtons[i].press(false);
-    }
+        data->state = LV_INDEV_STATE_PRESSED;
 
-    if (appButtons[i].justPressed()) {
-      appButtons[i].drawButton(true);  // Invert colors on press
-      openApp(i);  // Open selected app
-    } else if (appButtons[i].justReleased()) {
-      appButtons[i].drawButton();  // Draw normal
+        data->point.x = x;
+        data->point.y = y;
     }
-  }
 }
 
-// Placeholder function for opening an app
-void openApp(int appIndex) {
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(100, 100);
-  tft.setTextSize(2);
-  tft.setTextColor(TFT_WHITE);
-  tft.print("Opening ");
-  tft.println(appLabels[appIndex]);
-  delay(1000);  // Temporary delay, replace with actual app code
-  drawMainMenu();  // Return to main menu for now
-}
 
 // Calibration function for touch screen
 void touch_calibrate() {
@@ -104,17 +159,17 @@ void touch_calibrate() {
   }
 
   if (calDataOK && !REPEAT_CAL) {
-    tft.setTouch(calData);
+    tft->setTouch(calData);
   } else {
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(20, 0);
-    tft.setTextFont(2);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.println("Touch corners as indicated");
-    tft.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.println("Calibration complete!");
+    tft->fillScreen(TFT_BLACK);
+    tft->setCursor(20, 0);
+    tft->setTextFont(2);
+    tft->setTextSize(1);
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->println("Touch corners as indicated");
+    tft->calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
+    tft->setTextColor(TFT_GREEN, TFT_BLACK);
+    tft->println("Calibration complete!");
 
     File f = SPIFFS.open(CALIBRATION_FILE, "w");
     if (f) {
@@ -124,15 +179,84 @@ void touch_calibrate() {
   }
 }
 
-// Setup and loop functions
-void setup() {
-  Serial.begin(9600);
-  tft.init();
-  tft.setRotation(1);
-  touch_calibrate();
-  drawMainMenu(); // Draw initial menu
+/*use Arduinos millis() as tick source*/
+static uint32_t my_tick(void)
+{
+    return millis();
 }
 
-void loop() {
-  handleMainMenuTouch();
+void setup()
+{
+    String LVGL_Arduino = "Hello Arduino! ";
+    LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
+
+    Serial.begin( 115200 );
+    Serial.println( LVGL_Arduino );
+
+    lv_init();
+
+    /*Set a tick source so that LVGL will know how much time elapsed. */
+    lv_tick_set_cb(my_tick);
+
+    /* register print function for debugging */
+#if LV_USE_LOG != 0
+    lv_log_register_print_cb( my_print );
+#endif
+
+    lv_display_t * disp;
+#if LV_USE_TFT_ESPI
+    /*TFT_eSPI can be enabled lv_conf.h to initialize the display in a simple way*/
+    disp = lv_tft_espi_create(TFT_HOR_RES, TFT_VER_RES, draw_buf, sizeof(draw_buf));
+    lv_display_set_rotation(disp, TFT_ROTATION);
+    lv_tft_espi_t *driver=(lv_tft_espi_t*)lv_display_get_driver_data(disp);
+    tft = (TFT_eSPI*)driver->tft;
+    touch_calibrate();
+
+#else
+    /*Else create a display yourself*/
+    disp = lv_display_create(TFT_HOR_RES, TFT_VER_RES);
+    lv_display_set_flush_cb(disp, my_disp_flush);
+    lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf), LV_DISPLAY_RENDER_MODE_PARTIAL);
+#endif
+
+    /*Initialize the (dummy) input device driver*/
+    lv_indev_t * indev = lv_indev_create();
+    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); /*Touchpad should have POINTER type*/
+    lv_indev_set_read_cb(indev, my_touchpad_read);
+
+    /* Create a simple label
+     * ---------------------
+     lv_obj_t *label = lv_label_create( lv_screen_active() );
+     lv_label_set_text( label, "Hello Arduino, I'm LVGL!" );
+     lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
+
+     * Try an example. See all the examples
+     *  - Online: https://docs.lvgl.io/master/examples.html
+     *  - Source codes: https://github.com/lvgl/lvgl/tree/master/examples
+     * ----------------------------------------------------------------
+
+     lv_example_btn_1();
+
+     * Or try out a demo. Don't forget to enable the demos in lv_conf.h. E.g. LV_USE_DEMO_WIDGETS
+     * -------------------------------------------------------------------------------------------
+
+     lv_demo_widgets();
+     */
+    lv_example_button_1();
+
+    lv_obj_t *label = lv_label_create( lv_screen_active() );
+    lv_label_set_text( label, "Esto es un test!" );
+    lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
+
+    lv_obj_t *label2 = lv_label_create( lv_screen_active() );
+    lv_label_set_text( label2, "Esto es un test 2!" );
+    lv_obj_align( label2, LV_ALIGN_CENTER, 0, 200 );
+
+    Serial.println( "Setup done" );
+}
+
+void loop()
+{
+    lv_timer_handler(); /* let the GUI do its work */
+    delay(5); /* let this time pass */
 }
